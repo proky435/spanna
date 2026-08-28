@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="hu" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <title>Spanna — Vizsgatanuló</title>
+  <meta name="description" content="Modern tanulóalkalmazás vizsgára készülőknek." />
+
+  <!-- Inter font (modern, letisztult) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- PWA / iOS meta tagek -->
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Spanna" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" href="/favicon.ico" />
+
+  <!-- Sötét mód már az első festés előtt aktiválódik (nincs "villogás") -->
+  <script>
+    (function () {
+      try {
+        const saved = localStorage.getItem('spanna.theme');
+        // Alapból sötét — csak akkor világos, ha a felhasználó kifejezetten azt választotta
+        if (saved === 'light') {
+          // világos marad
+        } else {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body class="h-full">
+  <div id="root" class="min-h-full"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>
