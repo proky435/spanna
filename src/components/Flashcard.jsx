@@ -30,29 +30,22 @@ export default function Flashcard({ questions, ids, isWrongReview, isBookmarkRev
   const [finished, setFinished] = useState(false);
   const [wrongIds, setWrongIds] = useState([]); // session-ben elrontott kérdések (unique)
   const [totalAnswered, setTotalAnswered] = useState(0); // összes válasz (több lehet mint deck.length a visszapakolás miatt)
-  const requeuedRef = useRef(new Set());
-  const nextLockRef = useRef(false); // mely kérdéseket pakoltuk már vissza (hogy ne pakoljuk végtelenül)
+  const requeuedRef = useRef(new Map()); // mely kérdéseket pakoltuk már vissza (hogy ne pakoljuk végtelenül)
 
   const q = deck[idx];
 
-  // Billentyűzet-vezérlés
+  // Billentyűzet-vezérlés: csak válaszadás (1-5, A-E), léptetés csak gombbal
   const onKey = useCallback((e) => {
     if (finished) return;
     if (e.target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
     if (!q) return;
+    if (answered) return; // válasz után nincs billentyűzet akció
 
-    if (!answered) {
-      const key = e.key.toUpperCase();
-      const num = parseInt(e.key, 10);
-      if (num >= 1 && num <= q.options.length) { e.preventDefault(); answer(num - 1); return; }
-      const li = 'ABCDEFGH'.indexOf(key);
-      if (li >= 0 && li < q.options.length) { e.preventDefault(); answer(li); return; }
-    } else {
-      if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        next();
-      }
-    }
+    const key = e.key.toUpperCase();
+    const num = parseInt(e.key, 10);
+    if (num >= 1 && num <= q.options.length) { e.preventDefault(); answer(num - 1); return; }
+    const li = 'ABCDEFGH'.indexOf(key);
+    if (li >= 0 && li < q.options.length) { e.preventDefault(); answer(li); return; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answered, finished, q, idx]);
 
@@ -80,7 +73,7 @@ export default function Flashcard({ questions, ids, isWrongReview, isBookmarkRev
   function subtitle() {
     return isWrongReview ? 'Újragyakorlás azonnali visszajelzéssel'
       : isBookmarkReview ? 'Nehéz kérdések átismétlése'
-      : 'SM-2 ismétlés • 1-5 / A-E billentyűk • Space = következő';
+      : 'SM-2 ismétlés • 1-5 / A-E billentyűk a válaszhoz';
   }
 
   function answer(i) {
@@ -102,9 +95,8 @@ export default function Flashcard({ questions, ids, isWrongReview, isBookmarkRev
   }
 
   function next() {
-    if (nextLockRef.current) return;
-    nextLockRef.current = true;
-    setTimeout(() => { nextLockRef.current = false; }, 0);
+    // Szinkronan számoljuk ki az új pakli hosszt (elkerüljük a stale closure-t)
+    let newDeckLength = deck.length;
 
     if (!answered) {
       // Kihagyás: látottnak jelöljük, de nem hiba
@@ -115,10 +107,11 @@ export default function Flashcard({ questions, ids, isWrongReview, isBookmarkRev
       if (requeueCount < 2) {
         requeuedRef.current.set(q.id, requeueCount + 1);
         setDeck((d) => [...d, q]);
+        newDeckLength = deck.length + 1;
       }
     }
 
-    if (idx + 1 >= deck.length) {
+    if (idx + 1 >= newDeckLength) {
       setFinished(true);
       return;
     }
@@ -257,7 +250,7 @@ export default function Flashcard({ questions, ids, isWrongReview, isBookmarkRev
       {/* Navigáció */}
       <div className="flex items-center justify-between gap-3">
         <Button label="Kihagyás" variant="ghost" onClick={next} disabled={answered} />
-        <div className="text-xs text-slate-400 hidden sm:block">Space / → a folytatáshoz</div>
+        <div className="text-xs text-slate-400 hidden sm:block">Kattints a folytatáshoz</div>
         <Button
           label="Következő"
           variant="primary"
