@@ -30,7 +30,8 @@ export default function Flashcard({ questions, ids, isWrongReview, isBookmarkRev
   const [finished, setFinished] = useState(false);
   const [wrongIds, setWrongIds] = useState([]); // session-ben elrontott kérdések (unique)
   const [totalAnswered, setTotalAnswered] = useState(0); // összes válasz (több lehet mint deck.length a visszapakolás miatt)
-  const requeuedRef = useRef(new Set()); // mely kérdéseket pakoltuk már vissza (hogy ne pakoljuk végtelenül)
+  const requeuedRef = useRef(new Set());
+  const nextLockRef = useRef(false); // mely kérdéseket pakoltuk már vissza (hogy ne pakoljuk végtelenül)
 
   const q = deck[idx];
 
@@ -101,6 +102,10 @@ export default function Flashcard({ questions, ids, isWrongReview, isBookmarkRev
   }
 
   function next() {
+    if (nextLockRef.current) return;
+    nextLockRef.current = true;
+    setTimeout(() => { nextLockRef.current = false; }, 0);
+
     if (!answered) {
       // Kihagyás: látottnak jelöljük, de nem hiba
       if (q) markSeen(q.id, false);
