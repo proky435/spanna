@@ -78,6 +78,7 @@ export default function Home({ questions, selection, setSelection, onStart, orde
   // hogy a finalFiltered már hivatkozhat onlyUnseen-re.
   const [examCount, setExamCount] = useState(Math.min(20, filtered.length));
   const [onlyUnseen, setOnlyUnseen] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   // Szabad szöveges keresés a kérdésben (és opciókban)
   if (searchQuery && searchQuery.trim()) {
@@ -107,11 +108,18 @@ export default function Home({ questions, selection, setSelection, onStart, orde
         title="Spanna"
         subtitle="Vizsgatanuló — gyakorolj okosabban"
         right={
-          <IconButton
-            icon={<Icon name={state.theme === 'dark' ? 'sun' : 'moon'} />}
-            title={state.theme === 'dark' ? 'Világos mód' : 'Sötét mód'}
-            onClick={toggleTheme}
-          />
+          <>
+            <IconButton
+              icon={<span className="text-lg font-bold">?</span>}
+              title="Súgó — mit tud az app?"
+              onClick={() => setShowHelp(true)}
+            />
+            <IconButton
+              icon={<Icon name={state.theme === 'dark' ? 'sun' : 'moon'} />}
+              title={state.theme === 'dark' ? 'Világos mód' : 'Sötét mód'}
+              onClick={toggleTheme}
+            />
+          </>
         }
       />
 
@@ -343,6 +351,103 @@ export default function Home({ questions, selection, setSelection, onStart, orde
           />
         </div>
       )}
+
+      {/* Súgó modal */}
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+    </div>
+  );
+}
+
+// Súgó modal — rövid útmutató az app funkcióiról.
+function HelpModal({ onClose }) {
+  const sections = [
+    {
+      icon: '📚',
+      title: 'Kártyás tanulás',
+      desc: 'A fő mód. Azonnali visszajelzés, könyvjelzőzés (csillag), SM-2 okos ismétlés — a nehéz kérdések gyakrabban jönnek.',
+    },
+    {
+      icon: '📝',
+      title: 'Próbavizsga',
+      desc: 'Választhatsz 20/50/100/összes kérdésre. Időmérés van, a visszajelzés csak a végén. Hibajegyzéket kapsz.',
+    },
+    {
+      icon: '🔄',
+      title: 'Hibázottak',
+      desc: 'A rosszul megválaszolt kérdések gyűjteménye. Gyakorold őket, amíg nem megy hibátlanul!',
+    },
+    {
+      icon: '⭐',
+      title: 'Könyvjelzők',
+      desc: 'Kártyás módban a csillaggal jelölheted a nehéz kérdéseket — itt tudod őket külön gyakorolni.',
+    },
+    {
+      icon: '🎮',
+      title: 'Játékmódok',
+      desc: 'Túlélő (3 élet), Időfutam (60 mp), Bemagoló (csak olvasod a választ), Fordított kvíz (válaszból kérdés).',
+    },
+    {
+      icon: '🔍',
+      title: 'Keresés & szűrés',
+      desc: 'A keresővel szabad szövegre szűrhetsz. A szűrőpanelben vizsgatárgy/témakör választhatsz. "Csak új" = még nem látott kérdések.',
+    },
+    {
+      icon: '📊',
+      title: 'Statisztika',
+      desc: 'Az alsó navigációból éred el. Vizsgatörténet, témakörönkénti helyesség, nehéz kérdések száma.',
+    },
+    {
+      icon: '💾',
+      title: 'Adatmentés',
+      desc: 'Minden a böngésződben tárolódik (localStorage). Szerver nem kell — de váltasz böngészőt, újra kezded.',
+    },
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="card max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 animate-scale-in"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-xl font-bold">Súgó — mit tud a Spanna?</h2>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 btn-press"
+            aria-label="Bezárás"
+          >
+            <Icon name="x" size={18} />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {sections.map((s, i) => (
+            <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+              <span className="text-xl shrink-0">{s.icon}</span>
+              <div>
+                <h3 className="text-sm font-semibold mb-0.5">{s.title}</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{s.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
+          <p className="text-xs text-slate-400">
+            Spanna — vizsgatanuló app • React + Vite + Tailwind CSS
+          </p>
+        </div>
+
+        <Button
+          label="Értettem"
+          variant="primary"
+          className="w-full mt-4"
+          onClick={onClose}
+        />
+      </div>
     </div>
   );
 }
