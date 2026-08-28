@@ -333,7 +333,7 @@ export default function Home({ questions, selection, setSelection, onStart, orde
       </div>
 
       {/* Veszélyzóna */}
-      {(stats.seen || stats.wrong || stats.bookmarks) && (
+      {(stats.seen > 0 || stats.wrong > 0 || stats.bookmarks > 0) && (
         <div className="flex items-center justify-between rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-900/20 px-4 py-3">
           <div className="text-sm">
             <p className="font-medium text-rose-700 dark:text-rose-300">Összes haladás törlése</p>
