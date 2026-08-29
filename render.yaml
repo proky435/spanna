@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: spanna
+    name: vizsgamester
     env: static
     buildCommand: npm install && npm run build
     publishDir: dist

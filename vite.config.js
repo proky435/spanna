@@ -23,8 +23,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['questions.json', 'favicon.ico'],
       manifest: {
-        name: 'Spanna — Vizsgatanuló',
-        short_name: 'Spanna',
+        name: 'VizsgaMester — Vizsgatanuló',
+        short_name: 'VizsgaMester',
         description: 'Modern tanulóalkalmazás vizsgára készülőknek.',
         lang: 'hu',
         start_url: '/',

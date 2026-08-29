@@ -1,9 +1,9 @@
 {
-  "name": "spanna",
+  "name": "vizsgamester",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Spanna — modern vizsgatanuló webalkalmazás (React + Vite + Tailwind)",
+  "description": "VizsgaMester — modern vizsgatanuló webalkalmazás (React + Vite + Tailwind)",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",

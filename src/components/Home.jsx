@@ -105,7 +105,7 @@ export default function Home({ questions, selection, setSelection, onStart, orde
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 w-full pb-28">
       <Header
-        title="Spanna"
+        title="VizsgaMester"
         subtitle="Vizsgatanuló — gyakorolj okosabban"
         right={
           <>
@@ -413,7 +413,7 @@ function HelpModal({ onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-xl font-bold">Súgó — mit tud a Spanna?</h2>
+          <h2 className="text-xl font-bold">Súgó — mit tud a VizsgaMester?</h2>
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 btn-press"
@@ -437,7 +437,7 @@ function HelpModal({ onClose }) {
 
         <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
           <p className="text-xs text-slate-400">
-            Spanna — vizsgatanuló app • React + Vite + Tailwind CSS
+            VizsgaMester — vizsgatanuló app • React + Vite + Tailwind CSS
           </p>
         </div>
 

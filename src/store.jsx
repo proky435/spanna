@@ -40,7 +40,7 @@ function persist(state) {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(state));
   } catch (e) {
-    console.warn('Spanna: nem sikerült menteni az állapotot.', e);
+    console.warn('VizsgaMester: nem sikerült menteni az állapotot.', e);
   }
 }
 
