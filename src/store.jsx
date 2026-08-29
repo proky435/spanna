@@ -122,6 +122,11 @@ function reducer(state, action) {
     case 'RESET':
       return { ...DEFAULT_STATE };
 
+    case 'REPLACE_STATE':
+      // Sync: teljes state cseréje a backend-ből kapott adatokkal
+      // (theme-t nem írjuk felül — az eszközfüggő)
+      return { ...action.state, theme: state.theme };
+
     default:
       return state;
   }
@@ -150,6 +155,7 @@ export function StoreProvider({ children }) {
   const setLastExam = useCallback((result) => dispatch({ type: 'SET_LAST_EXAM', result }), []);
   const addExamHistory = useCallback((result) => dispatch({ type: 'ADD_EXAM_HISTORY', result }), []);
   const resetAll = useCallback(() => dispatch({ type: 'RESET' }), []);
+  const replaceState = useCallback((newState) => dispatch({ type: 'REPLACE_STATE', state: newState }), []);
 
   const isBookmarked = useCallback((id) => state.bookmarks.includes(id), [state.bookmarks]);
 
@@ -164,6 +170,7 @@ export function StoreProvider({ children }) {
     setTheme, toggleTheme,
     markSeen, addWrong, removeWrong, clearWrong,
     toggleBookmark, isBookmarked, setLastExam, addExamHistory, resetAll,
+    replaceState,
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

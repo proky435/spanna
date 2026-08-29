@@ -5,7 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { loadQuestions } from './data.js';
-import { StoreProvider } from './store.jsx';
+import { StoreProvider, useStore } from './store.jsx';
+import { AuthProvider, useAuth } from './auth.jsx';
+import { useSyncOnStateChange, usePullOnMount, mergeStates } from './sync.js';
 import { ToastProvider, Icon } from './components/ui.jsx';
 import Home from './components/Home.jsx';
 import Flashcard from './components/Flashcard.jsx';
@@ -15,6 +17,7 @@ import Survival from './components/Survival.jsx';
 import TimeAttack from './components/TimeAttack.jsx';
 import CheatSheet from './components/CheatSheet.jsx';
 import ReverseQuiz from './components/ReverseQuiz.jsx';
+import Auth from './components/Auth.jsx';
 
 function Spinner() {
   return (
@@ -95,6 +98,12 @@ function Shell() {
       .catch((e) => { if (alive) setError(e); });
     return () => { alive = false; };
   }, []);
+
+  // Ha nincs bejelentkezve → Auth képernyő (vendég mód gombbal)
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) {
+    return <Auth />;
+  }
 
   if (error) return <ErrorScreen err={error} onRetry={() => { setError(null); window.location.reload(); }} />;
   if (!questions) return <Spinner />;
@@ -187,14 +196,40 @@ function Shell() {
   );
 }
 
+// SyncManager: figyeli a store state-et és szinkronizál a backend-nek.
+// Csak akkor aktív, ha be van jelentkezve (vendég módban nem fut).
+function SyncManager() {
+  const { state, replaceState } = useStore();
+  const { isAuthenticated, isGuest, token, apiUrl } = useAuth();
+
+  // Csak valódi bejelentkezett user-nél fut a sync (vendég módban nem)
+  const canSync = isAuthenticated && !isGuest && !!token;
+
+  // Push: state változás → debounce 2s → push
+  useSyncOnStateChange(state, canSync, token, apiUrl);
+
+  // Pull: indításkor + online váltáskor
+  usePullOnMount(canSync, token, apiUrl, (remoteState, remoteUpdatedAt, localLastSync) => {
+    const merged = mergeStates(state, remoteState, remoteUpdatedAt, localLastSync);
+    if (merged !== state) {
+      replaceState(merged);
+    }
+  });
+
+  return null; // nem renderel semmit
+}
+
 export default function App() {
   return (
-    <StoreProvider>
-      <ToastProvider>
-        <div className="min-h-screen bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased transition-colors app-container">
-          <Shell />
-        </div>
-      </ToastProvider>
-    </StoreProvider>
+    <AuthProvider>
+      <StoreProvider>
+        <ToastProvider>
+          <SyncManager />
+          <div className="min-h-screen bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased transition-colors app-container">
+            <Shell />
+          </div>
+        </ToastProvider>
+      </StoreProvider>
+    </AuthProvider>
   );
 }

@@ -8,6 +8,7 @@
 import React, { useState } from 'react';
 import { listSubjects, listTopics, filterQuestions } from '../data.js';
 import { useStore } from '../store.jsx';
+import { useAuth } from '../auth.jsx';
 import { Badge, Button, IconButton, Icon, Header, useToast } from './ui.jsx';
 
 const STAT_TONES = {
@@ -65,7 +66,9 @@ function ModeCard({ icon, title, desc, tone, onClick, disabled, children }) {
 
 export default function Home({ questions, selection, setSelection, onStart, ordered, setOrdered, searchQuery, setSearchQuery }) {
   const { state, stats, toggleTheme, resetAll } = useStore();
+  const { user, logout, isGuest } = useAuth();
   const toast = useToast();
+  const [showProfile, setShowProfile] = useState(false);
 
   const subjects = listSubjects(questions);
   const topics = listTopics(questions, selection.subject);
@@ -118,6 +121,15 @@ export default function Home({ questions, selection, setSelection, onStart, orde
               icon={<Icon name={state.theme === 'dark' ? 'sun' : 'moon'} />}
               title={state.theme === 'dark' ? 'Világos mód' : 'Sötét mód'}
               onClick={toggleTheme}
+            />
+            <IconButton
+              icon={
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${isGuest ? 'bg-slate-300 text-slate-600 dark:bg-slate-700 dark:text-slate-300' : 'bg-brand-600 text-white'}`}>
+                  {isGuest ? 'V' : (user?.email?.[0]?.toUpperCase() || '?')}
+                </div>
+              }
+              title={isGuest ? 'Vendég mód — adataid csak ezen az eszközön' : `Bejelentkezve: ${user?.email}`}
+              onClick={() => setShowProfile(true)}
             />
           </>
         }
@@ -354,6 +366,16 @@ export default function Home({ questions, selection, setSelection, onStart, orde
 
       {/* Súgó modal */}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+
+      {/* Profil modal */}
+      {showProfile && (
+        <ProfileModal
+          user={user}
+          isGuest={isGuest}
+          onClose={() => setShowProfile(false)}
+          onLogout={() => { logout(); setShowProfile(false); }}
+        />
+      )}
     </div>
   );
 }
@@ -447,6 +469,70 @@ function HelpModal({ onClose }) {
           className="w-full mt-4"
           onClick={onClose}
         />
+      </div>
+    </div>
+  );
+}
+
+// Profil modal — fiók info + kijelentkezés
+function ProfileModal({ user, isGuest, onClose, onLogout }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="card max-w-sm w-full p-6 animate-scale-in"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-xl font-bold">Fiók</h2>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 btn-press"
+            aria-label="Bezárás"
+          >
+            <Icon name="x" size={18} />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${isGuest ? 'bg-slate-300 text-slate-600 dark:bg-slate-700 dark:text-slate-300' : 'bg-brand-600 text-white'}`}>
+              {isGuest ? 'V' : (user?.email?.[0]?.toUpperCase() || '?')}
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold truncate">{isGuest ? 'Vendég mód' : user?.email}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {isGuest ? 'Adataid csak ezen az eszközön' : 'Bejelentkezve • szinkronizálva'}
+              </p>
+            </div>
+          </div>
+
+          {isGuest && (
+            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                Vendég módban az adataid csak ezen az eszközön lesznek elérhetők.
+                Bejelentkezéssel több eszköz között is szinkronizálhatsz.
+              </p>
+            </div>
+          )}
+
+          <Button
+            label={isGuest ? 'Bejelentkezés / Regisztráció' : 'Kijelentkezés'}
+            variant={isGuest ? 'primary' : 'danger'}
+            className="w-full"
+            onClick={() => {
+              if (isGuest) {
+                // Vendég → bejelentkezés képernyő
+                localStorage.removeItem('vm.user');
+                window.location.reload();
+              } else {
+                onLogout();
+              }
+            }}
+          />
+        </div>
       </div>
     </div>
   );
