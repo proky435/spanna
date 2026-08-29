@@ -38,7 +38,7 @@ services:
       - key: JWT_SECRET
         sync: false  # manuálisan kell beállítani a Render dashboard-on
       - key: FRONTEND_URL
-        value: https://vizsgamester.onrender.com
+        value: https://spanna.onrender.com
       - key: DATABASE_URL
         fromDatabase:
           name: vizsgamester-db

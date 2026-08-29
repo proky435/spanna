@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3001;
 
 // CORS: a frontend domain engedélyezve (dev + prod)
 const allowedOrigins = [
-  process.env.FRONTEND_URL,                    // prod URL (pl. https://vizsgamester.onrender.com)
+  process.env.FRONTEND_URL,                    // prod URL (spanna.onrender.com)
   'http://localhost:5173',                     // Vite dev
   'http://localhost:4173',                     // Vite preview
   'http://127.0.0.1:5173',
