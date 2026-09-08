@@ -137,7 +137,8 @@ export default function Stats({ questions, onBack }) {
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium">{fmtDate(exam.date, true)}</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400">
-                        {exam.correct}/{exam.total} helyes • {exam.wrongList.length} hiba
+                        {exam.mode === 'live-exam' ? 'Éles vizsga' : 'Vizsga / Teszt'} • {exam.correct}/{exam.total} helyes • {exam.wrongList.length} hiba
+                        {Number.isFinite(exam.duration) ? ` • ${fmtTime(exam.duration)}` : ''}
                       </div>
                     </div>
                     <div className={`text-lg font-bold tabular-nums ${toneText}`}>{exam.percent}%</div>

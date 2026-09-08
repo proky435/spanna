@@ -145,6 +145,24 @@ function Shell() {
     );
   }
 
+  if (screen.name === 'liveexam') {
+    const restartKey = screen._nonce || 0;
+    return (
+      <Exam
+        key={restartKey}
+        questions={questions}
+        ids={screen.ids}
+        count={40}
+        timeLimit={40 * 60}
+        title="Éles vizsga mód"
+        historyMode="live-exam"
+        onBack={goHome}
+        onPracticeWrong={(wrongIds) => setScreen({ name: 'flashcard', ids: wrongIds, isWrongReview: true })}
+        onRestart={() => setScreen({ ...screen, _nonce: Date.now() })}
+      />
+    );
+  }
+
   // Játékmódok: Survival, TimeAttack, CheatSheet
   if (screen.name === 'survival') {
     return <Survival questions={questions} ids={screen.ids} onBack={goHome} />;
@@ -185,6 +203,7 @@ function Shell() {
         onStart={(mode, payload) => {
           if (mode === 'flashcard') setScreen({ name: 'flashcard', ...payload });
           if (mode === 'exam') setScreen({ name: 'exam', ...payload });
+          if (mode === 'liveexam') setScreen({ name: 'liveexam', ...payload });
           if (mode === 'survival') setScreen({ name: 'survival', ...payload });
           if (mode === 'timeattack') setScreen({ name: 'timeattack', ...payload });
           if (mode === 'cheatsheet') setScreen({ name: 'cheatsheet', ...payload });

@@ -8,7 +8,7 @@ import { useStore } from '../store.jsx';
 import { Badge, Button, IconButton, Icon, Header, ProgressBar, EmptyState } from './ui.jsx';
 import Confetti from './Confetti.jsx';
 
-export default function Exam({ questions, ids, count, onBack, onPracticeWrong, onRestart }) {
+export default function Exam({ questions, ids, count, onBack, onPracticeWrong, onRestart, title = 'Vizsga mód', historyMode = 'exam', timeLimit = null }) {
   const { markSeen, addWrong, removeWrong, setLastExam, addExamHistory } = useStore();
 
   // Pakli: mindig véletlenszerű, count darab
@@ -27,10 +27,16 @@ export default function Exam({ questions, ids, count, onBack, onPracticeWrong, o
   useEffect(() => {
     if (finished) return;
     const interval = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      const nextElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      if (timeLimit && nextElapsed >= timeLimit) {
+        setElapsed(timeLimit);
+        setFinished(true);
+        return;
+      }
+      setElapsed(nextElapsed);
     }, 1000);
     return () => clearInterval(interval);
-  }, [finished]);
+  }, [finished, timeLimit]);
 
   const q = deck[idx];
 
@@ -105,14 +111,16 @@ export default function Exam({ questions, ids, count, onBack, onPracticeWrong, o
       if (isCorrect) removeWrong(dq.id);
       else addWrong(dq.id);
     });
-    setLastExam({ total: result.total, correct: result.correct, percent: result.percent, at: result.at });
+    setLastExam({ total: result.total, correct: result.correct, percent: result.percent, at: result.at, mode: historyMode, duration: elapsed });
     // Mentés a vizsgatörténetbe (Stats timeline)
     addExamHistory({
       date: result.at,
       total: result.total,
       correct: result.correct,
       percent: result.percent,
-      mode: 'exam',
+      mode: historyMode,
+      duration: elapsed,
+      timeLimit,
       wrongList: result.wrongList.map((w) => ({ id: w.q.id, chosen: w.chosen })),
     });
   }, [finished, result]);
@@ -120,7 +128,7 @@ export default function Exam({ questions, ids, count, onBack, onPracticeWrong, o
   if (deck.length === 0) {
     return (
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 w-full">
-        <Header title="Vizsga mód" onBack={onBack} />
+        <Header title={title} onBack={onBack} />
         <EmptyState
           icon={<Icon name="target" />}
           title="Nincs elérhető kérdés"
@@ -140,7 +148,7 @@ export default function Exam({ questions, ids, count, onBack, onPracticeWrong, o
     return (
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 w-full">
         <Confetti active={percent >= 80} />
-        <Header title="Vizsga eredménye" subtitle={`${correct} / ${total} helyes`} onBack={onBack} />
+        <Header title={`${title} eredménye`} subtitle={`${correct} / ${total} helyes`} onBack={onBack} />
 
         <div className="card p-6 mb-6 text-center card-enter">
           <div className={`text-7xl font-bold ${toneText}`}>{percent}%</div>
@@ -148,6 +156,7 @@ export default function Exam({ questions, ids, count, onBack, onPracticeWrong, o
           <p className="mt-1 text-slate-500 dark:text-slate-400">{correct} helyes / {total - correct} hibás</p>
           <p className="mt-1 text-sm text-slate-400 dark:text-slate-500">
             ⏱ {fmtTime(elapsed)} • {total > 0 ? fmtTime(Math.round(elapsed / total)) : '00:00'} / kérdés
+            {timeLimit && elapsed >= timeLimit ? ' • Az idő lejárt' : ''}
           </p>
         </div>
 
@@ -160,7 +169,7 @@ export default function Exam({ questions, ids, count, onBack, onPracticeWrong, o
             onClick={() => onPracticeWrong && onPracticeWrong(wrongList.map((w) => w.q.id))}
           />
           <Button
-            label="Új vizsga"
+            label={`Új ${title.toLowerCase()}`}
             variant="secondary"
             icon={<Icon name="target" size={16} />}
             onClick={() => onRestart && onRestart()}
@@ -205,8 +214,8 @@ export default function Exam({ questions, ids, count, onBack, onPracticeWrong, o
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 w-full">
       <Header
-        title="Vizsga mód"
-        subtitle={`${deck.length} kérdés • A végén összesítő és hibajegyzék`}
+        title={title}
+        subtitle={`${deck.length} kérdés${timeLimit ? ` • ${Math.round(timeLimit / 60)} perc` : ''} • Kiértékelés a végén`}
         onBack={() => {
           if (confirm('Biztosan megszakítod a vizsgát? Az eddigi válaszok elvesznek.')) onBack();
         }}
@@ -215,8 +224,8 @@ export default function Exam({ questions, ids, count, onBack, onPracticeWrong, o
       <div className="flex items-center gap-3 mb-4">
         <div className="text-sm font-medium tabular-nums whitespace-nowrap">{idx + 1} / {deck.length}</div>
         <div className="flex-1"><ProgressBar current={idx + 1} total={deck.length} /></div>
-        <div className="text-sm font-medium tabular-nums whitespace-nowrap text-brand-600 dark:text-brand-400">
-          {fmtTime(elapsed)}
+        <div className={`text-sm font-medium tabular-nums whitespace-nowrap ${timeLimit && timeLimit - elapsed <= 300 ? 'text-rose-600 dark:text-rose-400' : 'text-brand-600 dark:text-brand-400'}`}>
+          {timeLimit ? fmtTime(Math.max(0, timeLimit - elapsed)) : fmtTime(elapsed)}
         </div>
       </div>
 

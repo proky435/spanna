@@ -286,6 +286,17 @@ export default function Home({ questions, selection, setSelection, onStart, orde
         </ModeCard>
 
         <ModeCard
+          icon={<Icon name="target" size={22} />}
+          title="Éles vizsga mód"
+          desc={finalFiltered.length >= 40
+            ? '40 véletlenszerű kérdés, 40 perc. Kiértékelés és hibajegyzék csak a végén.'
+            : `Legalább 40 kiválasztott kérdés szükséges (${finalFiltered.length} / 40).`}
+          tone="green"
+          disabled={finalFiltered.length < 40}
+          onClick={() => onStart('liveexam', { ids: finalFiltered.map((q) => q.id), count: 40 })}
+        />
+
+        <ModeCard
           icon={<Icon name="refresh" size={22} />}
           title="Hibázott kérdések"
           desc={wrongIds.length ? `${wrongIds.length} kérdés újragyakorlása azonnali visszajelzéssel.` : 'Még nincs hibázott kérdés — gyakorolj egyet!'}
