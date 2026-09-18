@@ -2,6 +2,7 @@
 // PostgreSQL kapcsolat + sémák inicializálása.
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
+import { runMigrations } from './migrate.js';
 
 dotenv.config();
 
@@ -22,21 +23,7 @@ pool.on('error', (err) => {
 export async function initDB() {
   const client = await pool.connect();
   try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id          SERIAL PRIMARY KEY,
-        email       VARCHAR(255) UNIQUE NOT NULL,
-        password    VARCHAR(255) NOT NULL,
-        created_at  TIMESTAMP DEFAULT NOW()
-      );
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS user_state (
-        user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-        state       JSONB NOT NULL,
-        updated_at  TIMESTAMP DEFAULT NOW()
-      );
-    `);
+    await runMigrations(client);
     console.log('DB séma inicializálva.');
   } finally {
     client.release();

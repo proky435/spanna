@@ -3,6 +3,8 @@
 // Modernizált: lágy árnyékok, mikro-interakciók (active:scale), finom gradiensek.
 
 import React from 'react';
+import { useAuth } from '../auth.jsx';
+import { getSyncStatus, subscribeSyncStatus } from '../syncMerge.js';
 
 const TONES = {
   slate: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
@@ -92,6 +94,7 @@ const ICON_PATHS = {
   target: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></>,
   list:   <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
   home:   <path d="M3 11l9-8 9 8M5 10v10h14V10" />,
+  users:  <><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 3.5a4 4 0 0 1 0 7.5M17 14a6 6 0 0 1 4 5.7V21" /></>,
 };
 
 export function Icon({ name, size = 20, className = '' }) {
@@ -112,6 +115,29 @@ export function Icon({ name, size = 20, className = '' }) {
   );
 }
 
+const SYNC_DOTS = {
+  synced:  { cls: 'bg-emerald-500', label: 'Szinkronizálva a felhőbe' },
+  pending: { cls: 'bg-amber-400 animate-pulse', label: 'Szinkronizálatlan változás — küldés folyamatban' },
+  syncing: { cls: 'bg-amber-400 animate-pulse', label: 'Szinkronizálás…' },
+  error:   { cls: 'bg-rose-500', label: 'Szinkron hiba — automatikus újrapróbálkozás folyamatban' },
+  offline: { cls: 'bg-slate-400', label: 'Offline — a mentés helyben tárolódik' },
+};
+
+export function SyncIndicator() {
+  const { isAuthenticated, isGuest } = useAuth();
+  const status = React.useSyncExternalStore(subscribeSyncStatus, getSyncStatus);
+  if (!isAuthenticated || isGuest) return null;
+  const dot = SYNC_DOTS[status];
+  if (!dot) return null;
+  return (
+    <span
+      title={dot.label}
+      aria-label={dot.label}
+      className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${dot.cls}`}
+    />
+  );
+}
+
 export function Header({ title, subtitle, onBack, right }) {
   return (
     <header className="flex items-center gap-3 mb-6">
@@ -120,6 +146,7 @@ export function Header({ title, subtitle, onBack, right }) {
         <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">{title}</h1>
         {subtitle && <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{subtitle}</p>}
       </div>
+      <SyncIndicator />
       {right && <div className="flex items-center gap-2">{right}</div>}
     </header>
   );

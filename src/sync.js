@@ -1,31 +1,24 @@
 // src/sync.js
 // Szinkronizációs logika: push/pull a backend-nek.
 // Stratégia: localStorage a primer forrás (offline is működik).
-// Ha be van jelentkezve + online: state változás → push (debounce 2s).
-// App indításkor + online váltáskor: pull + merge.
-import { useAuth } from './auth.jsx';
+//
+// Folyamat:
+// - Lokális mutáció → dirty-flag (store.jsx jelöli) → 2 mp debounce → push.
+// - App indításkor + online váltáskor: pull → applyRemoteState dönti el,
+//   hogy remote csere vagy mezőszintű merge kell → merge esetén visszapush.
+// - Push hiba esetén a dirty-flag megmarad → 30 mp-es retry háttérben.
+import { useRef, useEffect } from 'react';
+import {
+  applyRemoteState,
+  clearLocalDirty,
+  isLocalDirty,
+  markLocalDirty,
+  setAppliedRemoteAt,
+  setSyncStatus,
+} from './syncMerge.js';
 
-const LAST_SYNC_KEY = 'vm.lastSync';
 const DEBOUNCE_MS = 2000;
-
-// Állapot merge: a frissebb nyer (last-write-wins a updatedAt alapján).
-// Ha a backend frissebb → backend nyer (kivéve ha a lokális új adatokat tartalmaz).
-// Egyszerűsített stratégia: ha a backend updatedAt > lokális lastSync → backend nyer.
-export function mergeStates(localState, remoteState, remoteUpdatedAt, localLastSync) {
-  if (!remoteState) return localState; // nincs remote → lokális marad
-  if (!localState) return remoteState; // nincs lokális → remote marad
-
-  // Ha a remote frissebb mint a lokális utolsó szinkron → remote nyer
-  const remoteTs = new Date(remoteUpdatedAt).getTime();
-  const localTs = localLastSync ? new Date(localLastSync).getTime() : 0;
-
-  if (remoteTs > localTs) {
-    // Remote nyer, de a theme-t a lokálisból vesszük (eszközfüggő)
-    return { ...remoteState, theme: localState.theme };
-  }
-  // Lokális frissebb → lokális marad
-  return localState;
-}
+const RETRY_MS = 30000;
 
 // Pull: lekéri a backend állapotát
 export async function pullState(token, apiUrl) {
@@ -50,71 +43,124 @@ export async function pushState(token, apiUrl, state) {
   return res.json(); // { updatedAt }
 }
 
-// Debounce-olt push hook
-import { useRef, useEffect } from 'react';
+async function doPush(token, apiUrl, state) {
+  setSyncStatus('syncing');
+  try {
+    const res = await pushState(token, apiUrl, state);
+    clearLocalDirty();
+    setAppliedRemoteAt(res.updatedAt);
+    setSyncStatus('synced');
+    return true;
+  } catch (err) {
+    console.warn('Szinkronizáció (push) sikertelen:', err.message);
+    setSyncStatus(navigator.onLine ? 'error' : 'offline');
+    return false;
+  }
+}
 
-export function useSyncOnStateChange(state, isAuthenticated, token, apiUrl) {
+// Debounce-olt push: lokális (dirty) változás → 2 mp → push.
+// A pull által alkalmazott merge is dirty-t jelöl → azt is ez tölti vissza.
+export function useSyncOnStateChange(state, canSync, token, apiUrl) {
   const debounceRef = useRef(null);
   const isFirstRender = useRef(true);
+  const latestRef = useRef({ state, token, apiUrl });
+  latestRef.current = { state, token, apiUrl };
 
   useEffect(() => {
-    // Ha nincs bejelentkezve vagy offline → nem szinkronizálunk
-    if (!isAuthenticated || !token || !navigator.onLine) return;
-
-    // Első render-nél nem pusholunk (csak pull van indításkor)
+    if (!canSync || !token) {
+      setSyncStatus('idle');
+      return;
+    }
+    if (!navigator.onLine) {
+      setSyncStatus('offline');
+      return;
+    }
+    // Első rendernél nem pusholunk — a pull fut le előbb (usePullOnMount).
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
+    if (!isLocalDirty()) return;
 
-    // Debounce: 2s múlva push, ha nem jön újabb változás
+    setSyncStatus('pending');
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      try {
-        await pushState(token, apiUrl, state);
-        localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
-      } catch (err) {
-        console.warn('Szinkronizáció (push) sikertelen:', err.message);
-      }
+    debounceRef.current = setTimeout(() => {
+      const latest = latestRef.current;
+      doPush(latest.token, latest.apiUrl, latest.state);
     }, DEBOUNCE_MS);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [state, isAuthenticated, token, apiUrl]);
+  }, [state, canSync, token, apiUrl]);
+
+  // Retry: ha a push elhasalt (dirty megmaradt), 30 mp-enként újrapróbáljuk.
+  useEffect(() => {
+    if (!canSync || !token) return;
+    const timer = setInterval(() => {
+      if (isLocalDirty() && navigator.onLine) {
+        const latest = latestRef.current;
+        doPush(latest.token, latest.apiUrl, latest.state);
+      }
+    }, RETRY_MS);
+    return () => clearInterval(timer);
+  }, [canSync, token]);
 }
 
-// Indításkori pull + online váltáskori pull
-export function usePullOnMount(isAuthenticated, token, apiUrl, onRemoteState) {
+// Indításkori pull + online váltáskori pull.
+// getLocalState: friss lokális state lekérése (ref-en keresztül, nem stale closure).
+// applyState: replaceState dispatch a store-ba.
+export function usePullOnMount(canSync, token, apiUrl, getLocalState, applyState) {
+  const refs = useRef({ getLocalState, applyState, token, apiUrl });
+  refs.current = { getLocalState, applyState, token, apiUrl };
+
   useEffect(() => {
-    if (!isAuthenticated || !token) return;
+    if (!canSync || !token) return;
 
     let cancelled = false;
 
     const doPull = async () => {
+      setSyncStatus('syncing');
       try {
         const { state: remoteState, updatedAt } = await pullState(token, apiUrl);
         if (cancelled) return;
-        if (remoteState) {
-          const localLastSync = localStorage.getItem(LAST_SYNC_KEY);
-          onRemoteState(remoteState, updatedAt, localLastSync);
+        const { getLocalState: getState, applyState: apply } = refs.current;
+        const result = applyRemoteState(getState(), remoteState, updatedAt);
+        if (result.apply) {
+          if (result.needsPush) {
+            markLocalDirty();
+            apply(result.state);
+            // A merge-et a debounce-os push tölti vissza (state-változás triggereli)
+            setSyncStatus('pending');
+          } else {
+            apply(result.state);
+            setSyncStatus('synced');
+          }
+        } else if (isLocalDirty()) {
+          // Remote nem változott, de lokális feltöltetlen → azonnali push
+          // (a debounce-os hook nem triggerel, mert a state nem változott).
+          doPush(token, apiUrl, getState());
+        } else {
+          setSyncStatus('synced');
         }
-        localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
       } catch (err) {
+        if (cancelled) return;
         console.warn('Szinkronizáció (pull) sikertelen:', err.message);
+        setSyncStatus(navigator.onLine ? 'error' : 'offline');
       }
     };
 
     doPull();
 
-    // Online esemény → újra pull
     const onOnline = () => doPull();
+    const onOffline = () => setSyncStatus('offline');
     window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
 
     return () => {
       cancelled = true;
       window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, token, apiUrl]);
+  }, [canSync, token, apiUrl]);
 }

@@ -4,6 +4,7 @@
 // SM-2 spaced repetition + vizsgatörténet (examHistory) támogatással.
 
 import { createContext, useContext, useEffect, useReducer, useCallback } from 'react';
+import { markLocalDirty } from './syncMerge.js';
 
 const LS_KEY = 'spanna.state.v2'; // v2: új mezők (sm2, examHistory)
 
@@ -135,7 +136,15 @@ function reducer(state, action) {
 const StoreContext = createContext(null);
 
 export function StoreProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, undefined, load);
+  const [state, baseDispatch] = useReducer(reducer, undefined, load);
+
+  // Lokális mutációk dirty-flagelése a szinkronhoz.
+  // A REPLACE_STATE a pull által alkalmazott állapot — azt nem jelöljük
+  // (a pull kezelő dönti el, hogy a merge-et vissza kell-e tölteni).
+  const dispatch = useCallback((action) => {
+    if (action.type !== 'REPLACE_STATE') markLocalDirty();
+    baseDispatch(action);
+  }, []);
 
   useEffect(() => { persist(state); }, [state]);
   useEffect(() => {

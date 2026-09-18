@@ -6,8 +6,14 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 const TOKEN_KEY = 'vm.token';
 const USER_KEY = 'vm.user';
 
-// Backend API URL — prod-ban környezeti változó, dev-ben localhost
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Backend API URL — prod-ban a VITE_API_URL (Render URL). Dev-ben a
+// localhost/127.0.0.1 részt lecseréljük az oldal tényleges hosztnevére:
+// így LAN IP-ről (pl. telefonról) megnyitva is a fejlesztőgép felé megy
+// az API-hívás, és a gép IP-jének változása sem okoz gondot.
+const envApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = envApiUrl
+  .replace('localhost', window.location.hostname)
+  .replace('127.0.0.1', window.location.hostname);
 
 const AuthContext = createContext(null);
 

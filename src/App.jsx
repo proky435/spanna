@@ -3,11 +3,12 @@
 // navigációt (Home | Flashcard | Exam | Stats), becsomagolja a StoreProvider-t.
 // Mobil-first: alsó navigációs sáv, safe-area támogatás.
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { loadQuestions } from './data.js';
 import { StoreProvider, useStore } from './store.jsx';
 import { AuthProvider, useAuth } from './auth.jsx';
-import { useSyncOnStateChange, usePullOnMount, mergeStates } from './sync.js';
+import { InstitutionProvider } from './institutions.jsx';
+import { useSyncOnStateChange, usePullOnMount } from './sync.js';
 import { ToastProvider, Icon } from './components/ui.jsx';
 import Home from './components/Home.jsx';
 import Flashcard from './components/Flashcard.jsx';
@@ -18,6 +19,8 @@ import TimeAttack from './components/TimeAttack.jsx';
 import CheatSheet from './components/CheatSheet.jsx';
 import ReverseQuiz from './components/ReverseQuiz.jsx';
 import Auth from './components/Auth.jsx';
+import QuestionBanks from './components/QuestionBanks.jsx';
+import Institutions from './components/Institutions.jsx';
 
 function Spinner() {
   return (
@@ -54,18 +57,22 @@ function ErrorScreen({ err, onRetry }) {
 // Modernizált: lebegő pill formátum, backdrop-blur, aktív elem kiemelt háttérrel.
 function BottomNav({ current, onNavigate }) {
   const items = [
-    { key: 'home',  label: 'Kezdő',    icon: 'home' },
+    { key: 'home', label: 'Kezdő', icon: 'home' },
+    { key: 'questionbanks', label: 'Bankok', icon: 'book' },
+    { key: 'institutions', label: 'Szervezetek', icon: 'users' },
     { key: 'stats', label: 'Statisztika', icon: 'target' },
   ];
   return (
     <div className="fixed bottom-4 left-0 right-0 px-4 z-30 pointer-events-none bottom-nav">
-      <nav className="max-w-sm mx-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-lg shadow-slate-900/10 dark:shadow-black/40 rounded-full flex justify-between p-1.5 pointer-events-auto">
+      <nav className="max-w-lg mx-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-lg shadow-slate-900/10 dark:shadow-black/40 rounded-full flex justify-between p-1.5 pointer-events-auto">
         {items.map((item) => {
           const active = current === item.key;
           return (
             <button
               key={item.key}
               onClick={() => onNavigate(item.key)}
+              title={item.label}
+              aria-label={item.label}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full font-semibold text-sm transition-all btn-press ${
                 active
                   ? 'bg-brand-600 text-white shadow-sm shadow-brand-500/30'
@@ -73,7 +80,7 @@ function BottomNav({ current, onNavigate }) {
               }`}
             >
               <Icon name={item.icon} size={18} />
-              <span>{item.label}</span>
+              <span className="hidden sm:inline">{item.label}</span>
             </button>
           );
         })}
@@ -85,7 +92,7 @@ function BottomNav({ current, onNavigate }) {
 function Shell() {
   const [questions, setQuestions] = useState(null);
   const [error, setError] = useState(null);
-  const [screen, setScreen] = useState({ name: 'home' });
+  const [screen, setScreen] = useState(() => new URLSearchParams(window.location.search).has('invite') ? { name: 'institutions' } : { name: 'home' });
   const [selection, setSelection] = useState({ subject: null, topic: null });
   const [searchQuery, setSearchQuery] = useState('');
   // ordered: ha true, sorrendben jönnek a kérdések; ha false (alap), véletlenszerűen.
@@ -111,6 +118,15 @@ function Shell() {
   // Navigációs segédfüggvények
   const goHome = () => setScreen({ name: 'home' });
   const goStats = () => setScreen({ name: 'stats' });
+  const goQuestionBanks = () => setScreen({ name: 'questionbanks' });
+  const goInstitutions = () => setScreen({ name: 'institutions' });
+  const navigateMain = (name) => {
+    if (name === 'stats') goStats();
+    else if (name === 'questionbanks') goQuestionBanks();
+    else if (name === 'institutions') goInstitutions();
+    else goHome();
+  };
+  const startMode = (mode, payload) => setScreen({ name: mode, ...payload });
 
   // Flashcard / Exam: teljes képernyős, nincs bottom nav
   if (screen.name === 'flashcard') {
@@ -118,14 +134,14 @@ function Shell() {
     return (
       <Flashcard
         key={restartKey}
-        questions={questions}
+        questions={screen.customQuestions || questions}
         ids={screen.ids}
         isWrongReview={screen.isWrongReview}
         isBookmarkReview={screen.isBookmarkReview}
         ordered={ordered}
         onBack={goHome}
         onRestart={() => setScreen({ ...screen, _nonce: Date.now() })}
-        onPracticeWrong={(wrongIds) => setScreen({ name: 'flashcard', ids: wrongIds, isWrongReview: true, _nonce: Date.now() })}
+        onPracticeWrong={(wrongIds) => setScreen({ name: 'flashcard', ids: wrongIds, isWrongReview: true, customQuestions: screen.customQuestions, _nonce: Date.now() })}
       />
     );
   }
@@ -135,11 +151,11 @@ function Shell() {
     return (
       <Exam
         key={restartKey}
-        questions={questions}
+        questions={screen.customQuestions || questions}
         ids={screen.ids}
         count={screen.count}
         onBack={goHome}
-        onPracticeWrong={(wrongIds) => setScreen({ name: 'flashcard', ids: wrongIds, isWrongReview: true })}
+        onPracticeWrong={(wrongIds) => setScreen({ name: 'flashcard', ids: wrongIds, isWrongReview: true, customQuestions: screen.customQuestions })}
         onRestart={() => setScreen({ ...screen, _nonce: Date.now() })}
       />
     );
@@ -150,14 +166,14 @@ function Shell() {
     return (
       <Exam
         key={restartKey}
-        questions={questions}
+        questions={screen.customQuestions || questions}
         ids={screen.ids}
         count={40}
         timeLimit={40 * 60}
         title="Éles vizsga mód"
         historyMode="live-exam"
         onBack={goHome}
-        onPracticeWrong={(wrongIds) => setScreen({ name: 'flashcard', ids: wrongIds, isWrongReview: true })}
+        onPracticeWrong={(wrongIds) => setScreen({ name: 'flashcard', ids: wrongIds, isWrongReview: true, customQuestions: screen.customQuestions })}
         onRestart={() => setScreen({ ...screen, _nonce: Date.now() })}
       />
     );
@@ -180,11 +196,29 @@ function Shell() {
     return <ReverseQuiz questions={questions} ids={screen.ids} onBack={goHome} />;
   }
 
+  if (screen.name === 'questionbanks') {
+    return (
+      <>
+        <QuestionBanks onBack={goHome} onStart={startMode} />
+        <BottomNav current="questionbanks" onNavigate={navigateMain} />
+      </>
+    );
+  }
+
+  if (screen.name === 'institutions') {
+    return (
+      <>
+        <Institutions onBack={goHome} />
+        <BottomNav current="institutions" onNavigate={navigateMain} />
+      </>
+    );
+  }
+
   if (screen.name === 'stats') {
     return (
       <>
         <Stats questions={questions} onBack={goHome} />
-        <BottomNav current="stats" onNavigate={(k) => k === 'home' ? goHome() : goStats()} />
+        <BottomNav current="stats" onNavigate={navigateMain} />
       </>
     );
   }
@@ -200,17 +234,9 @@ function Shell() {
         setOrdered={setOrdered}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
-        onStart={(mode, payload) => {
-          if (mode === 'flashcard') setScreen({ name: 'flashcard', ...payload });
-          if (mode === 'exam') setScreen({ name: 'exam', ...payload });
-          if (mode === 'liveexam') setScreen({ name: 'liveexam', ...payload });
-          if (mode === 'survival') setScreen({ name: 'survival', ...payload });
-          if (mode === 'timeattack') setScreen({ name: 'timeattack', ...payload });
-          if (mode === 'cheatsheet') setScreen({ name: 'cheatsheet', ...payload });
-          if (mode === 'reversequiz') setScreen({ name: 'reversequiz', ...payload });
-        }}
+        onStart={startMode}
       />
-      <BottomNav current="home" onNavigate={(k) => k === 'home' ? goHome() : goStats()} />
+      <BottomNav current="home" onNavigate={navigateMain} />
     </>
   );
 }
@@ -224,16 +250,15 @@ function SyncManager() {
   // Csak valódi bejelentkezett user-nél fut a sync (vendég módban nem)
   const canSync = isAuthenticated && !isGuest && !!token;
 
-  // Push: state változás → debounce 2s → push
+  // A pull mindig a friss state-et lássa (nem a mount-kori closure-t)
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  // Push: lokális (dirty) változás → debounce 2s → push + 30s retry
   useSyncOnStateChange(state, canSync, token, apiUrl);
 
-  // Pull: indításkor + online váltáskor
-  usePullOnMount(canSync, token, apiUrl, (remoteState, remoteUpdatedAt, localLastSync) => {
-    const merged = mergeStates(state, remoteState, remoteUpdatedAt, localLastSync);
-    if (merged !== state) {
-      replaceState(merged);
-    }
-  });
+  // Pull: indításkor + online váltáskor → remote csere vagy mezőszintű merge
+  usePullOnMount(canSync, token, apiUrl, () => stateRef.current, replaceState);
 
   return null; // nem renderel semmit
 }
@@ -241,14 +266,16 @@ function SyncManager() {
 export default function App() {
   return (
     <AuthProvider>
-      <StoreProvider>
-        <ToastProvider>
-          <SyncManager />
-          <div className="min-h-screen bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased transition-colors app-container">
-            <Shell />
-          </div>
-        </ToastProvider>
-      </StoreProvider>
+      <InstitutionProvider>
+        <StoreProvider>
+          <ToastProvider>
+            <SyncManager />
+            <div className="min-h-screen bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased transition-colors app-container">
+              <Shell />
+            </div>
+          </ToastProvider>
+        </StoreProvider>
+      </InstitutionProvider>
     </AuthProvider>
   );
 }

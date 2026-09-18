@@ -7,8 +7,9 @@
 
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../store.jsx';
-import { listSubjects, listTopics, pct, fmtDate, fmtTime, letter, getDifficulty } from '../data.js';
+import { listSubjects, listTopics, pct, fmtDate, fmtTime, getDifficulty } from '../data.js';
 import { Header, Icon, EmptyState, Badge } from './ui.jsx';
+import { QuestionReview } from './Exam.jsx';
 
 export default function Stats({ questions, onBack }) {
   const { state, stats } = useStore();
@@ -121,9 +122,11 @@ export default function Stats({ questions, onBack }) {
           <div className="flex flex-col gap-2">
             {examHistory.map((exam) => {
               const isExpanded = expandedExam === exam.id;
-              const tone = exam.percent >= 80 ? 'green' : exam.percent >= 50 ? 'amber' : 'red';
+              const tone = exam.pendingCount > 0 && exam.gradedPoints === 0 ? 'amber' : exam.percent >= 80 ? 'green' : exam.percent >= 50 ? 'amber' : 'red';
               const toneText = { green: 'text-emerald-600', amber: 'text-amber-600', red: 'text-rose-600' }[tone];
               const toneBg = { green: 'bg-emerald-500', amber: 'bg-amber-500', red: 'bg-rose-500' }[tone];
+              const wrongList = exam.wrongList || [];
+              const pendingList = exam.pendingList || [];
 
               return (
                 <div key={exam.id} className="card overflow-hidden">
@@ -137,20 +140,21 @@ export default function Stats({ questions, onBack }) {
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium">{fmtDate(exam.date, true)}</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400">
-                        {exam.mode === 'live-exam' ? 'Éles vizsga' : 'Vizsga / Teszt'} • {exam.correct}/{exam.total} helyes • {exam.wrongList.length} hiba
+                        {exam.mode === 'live-exam' ? 'Éles vizsga' : 'Vizsga / Teszt'} • {exam.correct}/{exam.total} teljesen helyes • {wrongList.length} hiba
+                        {pendingList.length > 0 ? ` • ${pendingList.length} javításra vár` : ''}
                         {Number.isFinite(exam.duration) ? ` • ${fmtTime(exam.duration)}` : ''}
                       </div>
                     </div>
-                    <div className={`text-lg font-bold tabular-nums ${toneText}`}>{exam.percent}%</div>
+                    <div className={`text-lg font-bold tabular-nums ${toneText}`}>{exam.percent}%{pendingList.length > 0 ? '*' : ''}</div>
                     <Icon name={isExpanded ? 'arrowLeft' : 'arrowRight'} size={18} className="text-slate-400 rotate-90" />
                   </button>
 
                   {/* Kinyitva: hibajegyzék */}
-                  {isExpanded && exam.wrongList.length > 0 && (
+                  {isExpanded && wrongList.length > 0 && (
                     <div className="px-3 pb-3 border-t border-slate-200 dark:border-slate-800 pt-2">
                       <div className="flex flex-col gap-2">
-                        {exam.wrongList.map((w, i) => {
-                          const q = questions.find((x) => x.id === w.id);
+                        {wrongList.map((w, i) => {
+                          const q = questions.find((x) => x.id === w.id) || w.questionSnapshot;
                           if (!q) return null;
                           const diff = getDifficulty(state.sm2, q.id);
                           return (
@@ -158,24 +162,13 @@ export default function Stats({ questions, onBack }) {
                               <div className="flex items-start gap-2 mb-1.5">
                                 <span className="text-xs font-bold text-rose-500 mt-0.5">#{i + 1}</span>
                                 <p className="text-xs font-medium flex-1">{q.question}</p>
-                                {diff && diff.level !== 'new' && (
-                                  <Badge text={diff.label} tone={diff.color} />
-                                )}
+                                {diff && diff.level !== 'new' && <Badge text={diff.label} tone={diff.color} />}
                               </div>
-                              <div className="flex flex-col gap-1 text-xs pl-5">
-                                {q.options.map((opt, oi) => {
-                                  let cls = 'text-slate-500 dark:text-slate-400';
-                                  let mark = '';
-                                  if (oi === q.correctIndex) { cls = 'text-emerald-600 dark:text-emerald-400 font-medium'; mark = '✓ '; }
-                                  else if (oi === w.chosen) { cls = 'text-rose-600 dark:text-rose-400 font-medium line-through'; mark = '✗ '; }
-                                  return (
-                                    <div key={oi} className={`flex items-center gap-1.5 ${cls}`}>
-                                      <span className="w-4 text-center font-semibold">{letter(oi)}</span>
-                                      <span>{mark}{opt}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                              <QuestionReview
+                                question={q}
+                                answer={w.chosen}
+                                grade={{ isCorrect: false, awardedPoints: w.awardedPoints || 0, maxPoints: w.maxPoints || 1 }}
+                              />
                             </div>
                           );
                         })}
@@ -183,7 +176,25 @@ export default function Stats({ questions, onBack }) {
                     </div>
                   )}
 
-                  {isExpanded && exam.wrongList.length === 0 && (
+                  {isExpanded && pendingList.length > 0 && (
+                    <div className="px-3 pb-3 border-t border-slate-200 dark:border-slate-800 pt-2">
+                      <p className="text-sm font-medium text-amber-600 dark:text-amber-400 mb-2">{pendingList.length} válasz kézi javításra vár</p>
+                      <div className="flex flex-col gap-2">
+                        {pendingList.map((item, i) => {
+                          const q = questions.find((x) => x.id === item.id) || item.questionSnapshot;
+                          if (!q) return null;
+                          return (
+                            <div key={i} className="rounded-lg bg-amber-50 dark:bg-amber-900/20 p-2.5">
+                              <p className="text-xs font-medium mb-1.5">{q.question}</p>
+                              <QuestionReview question={q} answer={item.answer} grade={{ maxPoints: item.maxPoints || 1 }} pending />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {isExpanded && wrongList.length === 0 && pendingList.length === 0 && (
                     <div className="px-3 pb-3 border-t border-slate-200 dark:border-slate-800 pt-2">
                       <p className="text-sm text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                         <Icon name="check" size={16} /> Nincs hibázott kérdés — tökéletes!

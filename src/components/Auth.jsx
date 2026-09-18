@@ -69,7 +69,7 @@ export default function Auth() {
             disabled={loading}
           />
           {mode === 'register' && (
-            <p className="text-xs text-slate-400 mt-1">Legalább 6 karakter.</p>
+            <p className="text-xs text-slate-400 mt-1">Legalább 8 karakter.</p>
           )}
         </div>
 
