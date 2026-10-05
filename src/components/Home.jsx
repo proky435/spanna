@@ -6,10 +6,23 @@
 // vizsga kérdésszám-beállító, játékmódok, statisztikák, veszélyzóna.
 
 import React, { useState } from 'react';
-import { listSubjects, listTopics, filterQuestions } from '../data.js';
+import { listSubjects, listTopics, filterQuestions, getDifficulty } from '../data.js';
 import { useStore } from '../store.jsx';
 import { useAuth } from '../auth.jsx';
 import { Badge, Button, IconButton, Icon, Header, useToast } from './ui.jsx';
+
+const SEEN_OPTIONS = [
+  { value: 'all', label: 'Minden' },
+  { value: 'unseen', label: 'Csak újak' },
+  { value: 'seen', label: 'Csak látottak' },
+];
+
+const DIFFICULTY_OPTIONS = [
+  { level: 'new', label: 'Új', active: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 ring-1 ring-slate-400 dark:ring-slate-600' },
+  { level: 'easy', label: 'Könnyű', active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200 ring-1 ring-emerald-300 dark:ring-emerald-700' },
+  { level: 'medium', label: 'Közepes', active: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200 ring-1 ring-amber-300 dark:ring-amber-700' },
+  { level: 'hard', label: 'Nehéz', active: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200 ring-1 ring-rose-300 dark:ring-rose-700' },
+];
 
 const STAT_TONES = {
   brand: 'text-brand-600 dark:text-brand-300 bg-brand-50 dark:bg-brand-900/30',
@@ -78,10 +91,19 @@ export default function Home({ questions, selection, setSelection, onStart, orde
   });
 
   // Hook-ok: a useState hívásoknak a többi változó előtt kell lenniük,
-  // hogy a finalFiltered már hivatkozhat onlyUnseen-re.
+  // hogy a finalFiltered már hivatkozhat a szűrőállapotokra.
   const [examCount, setExamCount] = useState(Math.min(20, filtered.length));
-  const [onlyUnseen, setOnlyUnseen] = useState(false);
+  const [seenFilter, setSeenFilter] = useState('all'); // 'all' | 'unseen' | 'seen'
+  const [difficultyFilter, setDifficultyFilter] = useState(() => new Set());
   const [showHelp, setShowHelp] = useState(false);
+
+  const toggleDifficulty = (level) =>
+    setDifficultyFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(level)) next.delete(level);
+      else next.add(level);
+      return next;
+    });
 
   // Szabad szöveges keresés a kérdésben (és opciókban)
   if (searchQuery && searchQuery.trim()) {
@@ -93,11 +115,14 @@ export default function Home({ questions, selection, setSelection, onStart, orde
     );
   }
 
-  // "Csak még nem látottak" szűrése: olyan kérdés, ami nincs a progress-ben
-  // vagy seen=false. (state.progress[id]?.seen)
-  const finalFiltered = onlyUnseen
-    ? filtered.filter((q) => !state.progress[q.id]?.seen)
-    : filtered;
+  // Látva-szűrés: 'unseen' = nincs a progress-ben (vagy seen=false);
+  // 'seen' = már megválaszolt. Nehézség-szűrés az SM-2 getDifficulty alapján.
+  const finalFiltered = filtered.filter((q) => {
+    if (seenFilter === 'unseen' && state.progress[q.id]?.seen) return false;
+    if (seenFilter === 'seen' && !state.progress[q.id]?.seen) return false;
+    if (difficultyFilter.size && !difficultyFilter.has(getDifficulty(state.sm2, q.id).level)) return false;
+    return true;
+  });
 
   const wrongIds = state.wrong.filter((id) => questions.find((q) => q.id === id));
   const bmIds = state.bookmarks.filter((id) => questions.find((q) => q.id === id));
@@ -220,23 +245,53 @@ export default function Home({ questions, selection, setSelection, onStart, orde
               <Icon name={ordered ? 'shuffle' : 'list'} size={16} />
               {ordered ? 'Véletlenszerű' : 'Sorrendbe'}
             </button>
-            <button
-              type="button"
-              onClick={() => setOnlyUnseen((v) => !v)}
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all btn-press ${
-                onlyUnseen
-                  ? 'bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-200 ring-1 ring-brand-300 dark:ring-brand-700'
-                  : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-              }`}
-              title="Csak olyan kérdések, amiket még sosem válaszoltál meg"
-            >
-              <Icon name="target" size={16} />
-              Csak még nem látottak
-            </button>
           </div>
           <div className="text-sm text-slate-500 dark:text-slate-400">
             {finalFiltered.length} kérdés kiválasztva
-            {onlyUnseen && finalFiltered.length === 0 && ' — már mindet láttad! 🎉'}
+            {seenFilter === 'unseen' && finalFiltered.length === 0 && ' — már mindet láttad! 🎉'}
+          </div>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4 mt-4">
+          <div>
+            <span className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Állapot</span>
+            <div className="flex flex-wrap gap-2">
+              {SEEN_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setSeenFilter(opt.value)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all btn-press ${
+                    seenFilter === opt.value
+                      ? 'bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-200 ring-1 ring-brand-300 dark:ring-brand-700'
+                      : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+              Nehézség <span className="font-normal">(SM-2 alapján, több is választható)</span>
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {DIFFICULTY_OPTIONS.map((opt) => (
+                <button
+                  key={opt.level}
+                  type="button"
+                  onClick={() => toggleDifficulty(opt.level)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all btn-press ${
+                    difficultyFilter.has(opt.level)
+                      ? opt.active
+                      : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -422,7 +477,7 @@ function HelpModal({ onClose }) {
     {
       icon: '🔍',
       title: 'Keresés & szűrés',
-      desc: 'A keresővel szabad szövegre szűrhetsz. A szűrőpanelben vizsgatárgy/témakör választhatsz. "Csak új" = még nem látott kérdések.',
+      desc: 'A keresővel szabad szövegre szűrhetsz. A szűrőpanelben vizsgatárgy/témakör, állapot (új/látott) és nehézség (SM-2 alapú) választható.',
     },
     {
       icon: '📊',
