@@ -18,7 +18,6 @@ const SEEN_OPTIONS = [
 ];
 
 const DIFFICULTY_OPTIONS = [
-  { level: 'new', label: 'Új', active: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 ring-1 ring-slate-400 dark:ring-slate-600' },
   { level: 'easy', label: 'Könnyű', active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200 ring-1 ring-emerald-300 dark:ring-emerald-700' },
   { level: 'medium', label: 'Közepes', active: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200 ring-1 ring-amber-300 dark:ring-amber-700' },
   { level: 'hard', label: 'Nehéz', active: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200 ring-1 ring-rose-300 dark:ring-rose-700' },
@@ -273,9 +272,7 @@ export default function Home({ questions, selection, setSelection, onStart, orde
             </div>
           </div>
           <div>
-            <span className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-              Nehézség <span className="font-normal">(SM-2 alapján, több is választható)</span>
-            </span>
+            <span className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Nehézség</span>
             <div className="flex flex-wrap gap-2">
               {DIFFICULTY_OPTIONS.map((opt) => (
                 <button
